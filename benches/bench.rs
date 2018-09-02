@@ -31,8 +31,8 @@ fn random_items(meta_items: usize) -> impl Iterator<Item = (Price, Container<(Si
 fn bench_populating_push(c: &mut Criterion) {
     c.bench_function_over_inputs("populating items", |b, (items, metas)| {
         let items = random_items(*metas).take(*items).collect::<Vec<_>>();
-        let mut store = Store::new();
         b.iter_with_setup(|| items.clone(), |items| {
+            let mut store = Store::new();
             for item in items {
                 store.insert(item)
             }
