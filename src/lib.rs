@@ -38,14 +38,22 @@ impl Store {
         self.inner[idx].1.push(meta);
     }
 
-    // O(n * m)
+    // O((n + nr) * (m + mr))
     // n -- number of prices
     // m -- number of metadata chunks attached to each price
+    // nr -- number of elements that are memcpy'ed after removal from the array
+    // mr -- same for metadata things
+    //
+    // Worth noting that in __this__ particular usecase most of the time elements
+    // get removed from the beginning of the array and I've done an optimization
+    // for that so it's just O(1)
     pub fn split(&mut self, max_price: Price, mut requested_size: Size) -> Store {
         // Get an length of part of the prices array with prices < max_price
+        // O(log(n))
         let mut upper_bound = match self.find_price_idx(max_price) {
             Ok(idx) => {
                 // if found, there might be several equal prices, need the last one
+                // irrelevant for complexity, if array is not populated with the same prices
                 self.inner[idx..].iter()
                     .enumerate()
                     .take_while(|(_, (price, _))| *price <= max_price)
@@ -59,8 +67,10 @@ impl Store {
         let mut new = Container::with_capacity(self.inner.len());
 
         let mut idx = 0;
+        // O(n)
         while idx < upper_bound && requested_size != 0 {
             let price = self.inner[idx].0;
+            // O(m + mr)
             let (drained_sizes, new_sizes, left_requested) = self.split_sizes(idx, requested_size);
 
             if !new_sizes.is_empty() {
@@ -70,6 +80,7 @@ impl Store {
             requested_size = left_requested;
 
             if drained_sizes {
+                // O(nr)
                 self.inner.remove(idx);
                 upper_bound -= 1;
             } else {
@@ -82,22 +93,27 @@ impl Store {
 
     /// Returns if sizes of this sizes list was drained, produced sizes list
     /// and how much more volume is left to move to the new vector
+    // O(m + r)
     fn split_sizes(&mut self, price_idx: usize, mut requested: u32) -> (bool, SizeMetaList, u32) {
+        // O(1)
         let (_, sizes) = &mut self.inner[price_idx];
         let mut new_sizes = Container::with_capacity(sizes.len());
 
         let mut idx = 0;
+        // O(m)
         while idx < sizes.len() && requested != 0 {
             let should_remove = {
                 let (size, meta) = &mut sizes[idx];
                 let new_size = min(requested, *size);
                 *size -= new_size;
                 requested -= new_size;
+                // O(1)
                 new_sizes.push((new_size, *meta));
                 *size == 0
             };
 
             if should_remove {
+                // O(mr) though as mostly elements get deleted from the beginning it's just constant time average case
                 sizes.remove(idx);
             } else {
                 idx += 1;
