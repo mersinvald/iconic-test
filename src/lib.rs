@@ -46,7 +46,7 @@ impl Store {
     //
     // Worth noting that in __this__ particular usecase most of the time elements
     // get removed from the beginning of the array and I've done an optimization
-    // for that so it's just O(1)
+    // for that so nr and mr are just O(1)
     pub fn split(&mut self, max_price: Price, mut requested_size: Size) -> Store {
         // Get an length of part of the prices array with prices < max_price
         // O(log(n))
