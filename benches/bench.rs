@@ -49,8 +49,8 @@ fn bench_single_push(c: &mut Criterion) {
     c.bench_function_over_inputs("single push", |b, (items, metas)| {
         let mut items = random_items(*metas).take(*items).collect::<Vec<_>>();
         items.sort_by_key(|item| item.0);
-        let mut store = Store::from(Container::from(items.clone()));
-        b.iter_with_setup(|| (store.clone(), items.clone()), |(mut store, items)| {
+        let store = Store::from(Container::from(items.clone()));
+        b.iter_with_setup(|| store.clone(), |mut store| {
             store.insert((430, Container::from(vec![(99, 43), (201, 33)])))
         })
     }, &[
@@ -66,8 +66,8 @@ fn bench_append_meta(c: &mut Criterion) {
         let mut items = random_items(*metas).take(*items).collect::<Vec<_>>();
         let target = items[items.len() / 2].0;
         items.sort_by_key(|item| item.0);
-        let mut store = Store::from(Container::from(items.clone()));
-        b.iter_with_setup(|| (store.clone(), items.clone()), |(mut store, items)| {
+        let store = Store::from(Container::from(items.clone()));
+        b.iter_with_setup(|| store.clone(), |mut store| {
             store.append_size_and_meta_to_price(target, (55, 0));
         })
     }, &[
@@ -84,7 +84,7 @@ fn bench_split_median_price(c: &mut Criterion) {
         items.sort_by_key(|item| item.0);
         let target_price = items[items.len() / 2].0;
         let target_size = u32::max_value();
-        let mut store = Store::from(Container::from(items.clone()));
+        let store = Store::from(Container::from(items.clone()));
         b.iter_with_setup(|| store.clone(), |mut store| {
             store.split(target_price, target_size);
         })
@@ -109,7 +109,7 @@ fn bench_split_half_size(c: &mut Criterion) {
                     .sum::<u32>()
             ).sum::<u32>() / 2;
 
-        let mut store = Store::from(Container::from(items.clone()));
+        let store = Store::from(Container::from(items.clone()));
         b.iter_with_setup(|| store.clone(), |mut store| {
             store.split(target_price, target_size);
         })
@@ -121,6 +121,6 @@ fn bench_split_half_size(c: &mut Criterion) {
     ]);
 }
 
-criterion_group!(benches, bench_populating_push, bench_append_meta, bench_single_push, bench_split_median_price, bench_split_half_size);
-//criterion_group!(benches, bench_split_median_price, bench_split_half_size);
+//criterion_group!(benches, bench_populating_push, bench_append_meta, bench_single_push, bench_split_median_price, bench_split_half_size);
+criterion_group!(benches, bench_split_median_price, bench_split_half_size);
 criterion_main!(benches);

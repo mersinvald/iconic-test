@@ -1,7 +1,7 @@
 use std::fmt::{self, Debug};
-use std::ops::{Index, IndexMut};
+use std::ops::{Index, IndexMut, RangeFrom};
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct OptimizedVec<T> {
     first: usize,
     inner: Vec<T>
@@ -59,7 +59,7 @@ impl<T> OptimizedVec<T> {
 
     #[inline]
     pub fn remove(&mut self, idx: usize) {
-        assert!(self.len() != 0);
+        assert!(!self.is_empty());
 
         // likely branch goes first
         if !self.inner.is_empty() {
@@ -121,15 +121,23 @@ impl<T> From<Vec<T>> for OptimizedVec<T> {
 impl<T> Index<usize> for OptimizedVec<T> {
     type Output = T;
     #[inline]
-    fn index(&self, idx: usize) -> &T {
+    fn index(&self, idx: usize) -> &Self::Output {
         self.get(idx)
     }
 }
 
 impl<T> IndexMut<usize> for OptimizedVec<T> {
     #[inline]
-    fn index_mut(&mut self, idx: usize) -> &mut T {
+    fn index_mut(&mut self, idx: usize) -> &mut Self::Output {
         self.get_mut(idx)
+    }
+}
+
+impl<T> Index<RangeFrom<usize>> for OptimizedVec<T> {
+    type Output = [T];
+    #[inline]
+    fn index(&self, idx: RangeFrom<usize>) -> &Self::Output {
+        &self.inner[idx]
     }
 }
 

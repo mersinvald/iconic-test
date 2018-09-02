@@ -1,8 +1,5 @@
 pub mod optimized_vec;
-
 use std::cmp::min;
-use std::collections::VecDeque;
-use std::ops::{Deref, DerefMut};
 
 pub type Price = i32;
 pub type Size = u32;
@@ -11,8 +8,9 @@ pub type Meta = u128;
 pub type Container<T> = optimized_vec::OptimizedVec<T>;
 
 pub type StoreInner = Container<(Price, Container<(Size, Meta)>)>;
+pub type SizeMetaList = Container<(Size, Meta)>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Store {
     inner: StoreInner,
 }
@@ -35,7 +33,7 @@ impl Store {
     pub fn append_size_and_meta_to_price(&mut self, price: Price, meta: (Size, Meta)) {
         let idx = match self.find_price_idx(price) {
             Ok(idx) => idx,
-            Err(_) => panic!("price {} does not exist in Store"),
+            Err(_) => panic!("price {} does not exist in Store", price),
         };
         self.inner[idx].1.push(meta);
     }
@@ -44,43 +42,34 @@ impl Store {
     // n -- number of prices
     // m -- number of metadata chunks attached to each price
     pub fn split(&mut self, max_price: Price, mut requested_size: Size) -> Store {
+        // Get an length of part of the prices array with prices < max_price
         let mut upper_bound = match self.find_price_idx(max_price) {
-            Ok(idx) => idx + 1,
-            Err(idx) => min(idx + 1, self.inner.len()),
+            Ok(idx) => {
+                // if found, there might be several equal prices, need the last one
+                self.inner[idx..].iter()
+                    .enumerate()
+                    .take_while(|(_, (price, _))| *price <= max_price)
+                    .last()
+                    .map(|(idx, _)| idx + 1)
+                    .unwrap()
+            },
+            Err(idx) => min(idx, self.inner.len()),
         };
 
         let mut new = Container::with_capacity(self.inner.len());
 
         let mut idx = 0;
         while idx < upper_bound && requested_size != 0 {
-            let should_remove = {
-                let (price, sizes) = &mut self.inner[idx];
-                let mut new_sizes = Container::new();
-                let mut upper_bound = sizes.len();
-                let mut idx = 0;
-                while idx < sizes.len() && requested_size != 0 {
-                    let should_remove = {
-                        let (size, meta) = &mut sizes[idx];
-                        let new_size = min(requested_size, *size);
-                        *size -= new_size;
-                        requested_size -= new_size;
-                        new_sizes.push((new_size, *meta));
-                        *size == 0
-                    };
+            let price = self.inner[idx].0;
+            let (drained_sizes, new_sizes, left_requested) = self.split_sizes(idx, requested_size);
 
-                    if should_remove {
-                        sizes.remove(idx);
-                    } else {
-                        idx += 1;
-                    }
-                }
-                if !new_sizes.is_empty() {
-                    new.push((*price, new_sizes));
-                }
-                sizes.is_empty()
-            };
+            if !new_sizes.is_empty() {
+                new.push((price, new_sizes));
+            }
 
-            if should_remove {
+            requested_size = left_requested;
+
+            if drained_sizes {
                 self.inner.remove(idx);
                 upper_bound -= 1;
             } else {
@@ -89,6 +78,33 @@ impl Store {
         }
 
         Store::from(new)
+    }
+
+    /// Returns if sizes of this sizes list was drained, produced sizes list
+    /// and how much more volume is left to move to the new vector
+    fn split_sizes(&mut self, price_idx: usize, mut requested: u32) -> (bool, SizeMetaList, u32) {
+        let (_, sizes) = &mut self.inner[price_idx];
+        let mut new_sizes = Container::with_capacity(sizes.len());
+
+        let mut idx = 0;
+        while idx < sizes.len() && requested != 0 {
+            let should_remove = {
+                let (size, meta) = &mut sizes[idx];
+                let new_size = min(requested, *size);
+                *size -= new_size;
+                requested -= new_size;
+                new_sizes.push((new_size, *meta));
+                *size == 0
+            };
+
+            if should_remove {
+                sizes.remove(idx);
+            } else {
+                idx += 1;
+            }
+        }
+
+        (sizes.is_empty(), new_sizes, requested)
     }
 
     // O(log(n))
