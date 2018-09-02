@@ -1,0 +1,22 @@
+[package]
+name = "test-project"
+version = "0.1.0"
+authors = ["Mike Lubinets <lubinetsm@yandex.ru>"]
+
+[[bench]]
+name = "bench"
+harness = false
+
+[dependencies]
+criterion = "0.2.5"
+
+[dev-dependencies]
+test-case-derive = "0.2.0"
+rand = "0.5.5"
+criterion = "0.2.5"
+
+[profile.bench]
+debug = true
+
+[profile.release]
+debug = true
